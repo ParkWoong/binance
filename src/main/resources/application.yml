@@ -1,0 +1,10 @@
+spring:
+    application:
+        name: binance
+
+binance:
+    domain:
+        main: "https://api.binance.com"
+        get:
+            time: "/api/v3/time"
+  
