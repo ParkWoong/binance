@@ -20,7 +20,7 @@ public class PostConfig {
     @PostConstruct
     public void checkProperties(){
         //log.info("Domain : {}, {}", domainProperties.getMain(), domainProperties.getGet().getTime());
-        log.info("Test : {}", tradeService.test().getBody());
+        log.info("Connect Test : {}", tradeService.test().getBody());
     }
     
 }

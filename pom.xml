@@ -73,6 +73,22 @@
 			<artifactId>reactor-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- Dependency for WebSocket -->
+		<dependency>
+			<groupId>com.squareup.okhttp3</groupId>
+			<artifactId>okhttp</artifactId>
+			<version>4.12.0</version>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+		</dependency>
+		<!--Dependency for Calculating-->
+		<dependency>
+			<groupId>org.ta4j</groupId>
+			<artifactId>ta4j-core</artifactId>
+			<version>0.16</version>
+		</dependency>
 	</dependencies>
 
 	<build>

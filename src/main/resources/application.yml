@@ -4,7 +4,8 @@ spring:
 
 binance:
     domain:
-        main: "https://api.binance.com"
+        main: "https://fapi.binance.com"
         get:
-            time: "/api/v3/time"
+            time: "/fapi/v1/time"
+        kline: "/fapi/v1/klines"
   

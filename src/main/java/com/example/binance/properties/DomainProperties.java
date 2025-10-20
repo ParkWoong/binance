@@ -13,6 +13,7 @@ import lombok.Setter;
 public class DomainProperties {
     
     private String main;
+    private String klines;
     private Get get;
 
     @Getter
