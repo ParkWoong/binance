@@ -12,8 +12,8 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder
 public class BiasRegime {
-    public enum Bias{LONG, SHORT, NEUTRAL}
-    public enum Regime{TREND, RANGE}
+    public enum Bias{LONG, SHORT, NEUTRAL}  // 1D 시장의 방향
+    public enum Regime{TREND, RANGE}        // 4H 현재 시장의 상태(추세 vs 횡보)
     private Bias bias;
     private Regime regime;
     private String reason; //for logging and debugig

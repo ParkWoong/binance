@@ -7,5 +7,5 @@ binance:
         main: "https://fapi.binance.com"
         get:
             time: "/fapi/v1/time"
-        kline: "/fapi/v1/klines"
+        klines: "/fapi/v1/klines"
   
