@@ -1,13 +1,13 @@
 package com.example.binance.config;
 
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.event.EventListener;
 
 import com.example.binance.dto.BiasRegime;
-import com.example.binance.properties.DomainProperties;
 import com.example.binance.service.DirectionService;
-import com.example.binance.service.TradeService;
+import com.example.binance.service.KlineSocketService;
 
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -16,15 +16,15 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class PostConfig {
 
-    private final DomainProperties domainProperties;
-    private final TradeService tradeService;
     private final DirectionService directionService;
+    private final KlineSocketService klineSocketService;
 
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
     public void checkProperties(){
-        //log.info("Domain : {}, {}", domainProperties.getMain(), domainProperties.getGet().getTime());
-        //log.info("Connect Test : {}", tradeService.test().getBody());
-        BiasRegime br = directionService.evaluate("BTCUSDT");
+        final String coin = "BTCUSDT";
+
+        BiasRegime br = directionService.evaluate(coin);
+        klineSocketService.start(coin, br);
         log.info("{} | {}", br.getBias(), br.getRegime());
     }
     

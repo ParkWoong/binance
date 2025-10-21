@@ -31,9 +31,9 @@ public class WebClientConfig {
                 .create()
                 .doOnConnected(con -> con
                         .addHandlerFirst(
-                                new ReadTimeoutHandler(3000))
+                                new ReadTimeoutHandler(300))
                         .addHandlerLast(
-                                new WriteTimeoutHandler(3000)))
+                                new WriteTimeoutHandler(300)))
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 3000);
         return client;
     }
