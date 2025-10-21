@@ -14,6 +14,7 @@ public class DomainProperties {
     
     private String main;
     private String klines;
+    private String ws;
     private Get get;
 
     @Getter
