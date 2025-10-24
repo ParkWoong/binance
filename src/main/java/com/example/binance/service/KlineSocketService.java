@@ -1,5 +1,7 @@
 package com.example.binance.service;
 
+import java.util.Deque;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
@@ -8,11 +10,13 @@ import org.springframework.stereotype.Service;
 
 import com.example.binance.dto.BiasRegime;
 import com.example.binance.dto.Candle;
+import com.example.binance.dto.H1Env;
 import com.example.binance.enums.TimeFrame;
 import com.example.binance.properties.DomainProperties;
 import com.example.binance.ws.SymbolSession;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;  
+
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,12 +26,18 @@ import okhttp3.Response;
 import okhttp3.WebSocket;
 import okhttp3.WebSocketListener;
 
+
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class KlineSocketService {
     private final DomainProperties domain;
     private final TriggerService triggerService;
+    private final IndicatorService ind;
+    private final BInanceRestService bInanceRestService;
+
+
     private final ObjectMapper om = new ObjectMapper();
     private final OkHttpClient client = new OkHttpClient();
 
@@ -41,6 +51,8 @@ public class KlineSocketService {
         SymbolSession sess = new SymbolSession(symbol, new AtomicReference<BiasRegime>(initial));
 
         sessions.put(symbol, sess);
+
+        bootStrapH1Env(symbol, sess);
 
         final String streams = new StringBuilder(symbol.toLowerCase())
                                             .append("@kline_15m/")
@@ -96,12 +108,23 @@ public class KlineSocketService {
                         dq.removeFirst();
                     }
 
-                    java.util.Deque<Candle> dq1h = sess.getBuffers().get(TimeFrame.H1);
-                    java.util.Deque<Candle> dq15m = sess.getBuffers().get(TimeFrame.M15);
-
-                    if (dq1h != null && dq15m != null && dq1h.size() >= 60 && dq15m.size() >= 60) {
-                        triggerService.onCandleClosed(sess);
+                     // ✅ 2-a) H1 마감 들어오면 환경 갱신 (다음 한 시간 유효)
+                     if (tf == TimeFrame.H1) {
+                        refreshH1EnvFromBuffers(sess);
                     }
+
+                    // ✅ 2-b) M15 마감 들어오면 H1Env를 게이트로 트리거 평가
+                    if (tf == TimeFrame.M15) {
+                        triggerService.onCandleClosedWithH1Env(sess);
+                    }
+
+
+                    // java.util.Deque<Candle> dq1h = sess.getBuffers().get(TimeFrame.H1);
+                    // java.util.Deque<Candle> dq15m = sess.getBuffers().get(TimeFrame.M15);
+
+                    // if (dq1h != null && dq15m != null && dq1h.size() >= 60 && dq15m.size() >= 60) {
+                    //     triggerService.onCandleClosed(sess);
+                    // }
 
                 } catch (Exception e) {
                     log.warn("WS parse error {}: {}", symbol, e.getMessage());
@@ -137,9 +160,14 @@ public class KlineSocketService {
 
     /** 외부 스케줄러(1D/4H 마감)에서 Bias/Regime 갱신 */
     public void updateBiasRegime(String symbol, BiasRegime br) {
+        
         SymbolSession sess = sessions.get(symbol);
+        
+        //final String time = getNowMinute();
+
         if (sess != null) {
             sess.getBrRef().set(br);
+            //log.info("[Refresh] {} | {} | {}", time, sess.getBrRef().get().getBias(), sess.getBrRef().get().getRegime());
         }
     }
 
@@ -168,5 +196,70 @@ public class KlineSocketService {
         }
 
         return state;
+    }
+
+    private void bootStrapH1Env(String symbol, SymbolSession session){
+        List<Candle> h1 = bInanceRestService.klines(symbol, TimeFrame.H1, 200);
+        if(h1 == null || h1.size() < 60){
+            log.warn("H1 is not enough candles : {}", symbol);
+            return;
+        }
+
+        Deque<Candle> dq = session.buffer(TimeFrame.H1);
+        dq.clear();
+        for(Candle c : h1){
+            dq.addLast(c);
+        }
+
+        H1Env env = computeH1Env(h1);
+        session.getH1EnvRef().set(env);
+
+        log.info("H1 Value from first api : {}, longOk = {}, shortOk = {}", symbol, env.isLongOk(), env.isShortOk());
+    }
+
+    private void refreshH1EnvFromBuffers(SymbolSession sess) {
+        java.util.Deque<Candle> dq = sess.getBuffers().get(TimeFrame.H1);
+        if (dq == null || dq.size() < 60) return;
+        java.util.List<Candle> h1List = new java.util.ArrayList<Candle>(dq);
+        H1Env env = computeH1Env(h1List);
+        sess.getH1EnvRef().set(env);
+        log.info("Refresh H1Env {}: hourKey={}, longOk={}, shortOk={}",
+                 sess.getSymbol(), env.getHourKey(), env.isLongOk(), env.isShortOk());
+    }
+
+
+    private H1Env computeH1Env(List<Candle> h1) {
+        // 지표 계산
+        double ema21 = ind.ema(h1, TimeFrame.H1, 21);
+        double ema50 = ind.ema(h1, TimeFrame.H1, 50);
+        double rsi   = ind.rsi(h1, TimeFrame.H1, 14);
+        double[] bb  = ind.bollinger(h1, TimeFrame.H1, 20, 2);
+
+        Candle last = h1.get(h1.size() - 1);
+        long hourKey = last.getOpenTime() + 60L * 60L * 1000L; // H1 endTime(=closetime) 추정
+
+
+        int longScore = 0;
+        if (ema21 > ema50) longScore++;
+        if (rsi >= 48.0) longScore++;       // 약간 완화 (기존 50 → 48)
+        if (last.getClose() >= bb[0]) longScore++;
+
+
+        int shortScore = 0;
+        if (ema21 < ema50) shortScore++;
+        if (rsi <= 52.0) shortScore++;
+        if (last.getClose() <= bb[0]) shortScore++;
+
+        boolean longOk  = longScore >= 2;
+        boolean shortOk = shortScore >= 2;
+
+        return H1Env.builder()
+                .hourKey(hourKey)
+                .longOk(longOk)
+                .shortOk(shortOk)
+                .bbMid(bb[0])
+                .bbUp(bb[1])
+                .bbUp(bb[2])
+                .build();
     }
 }

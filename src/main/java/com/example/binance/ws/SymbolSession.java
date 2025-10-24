@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.example.binance.dto.BiasRegime;
 import com.example.binance.dto.Candle;
+import com.example.binance.dto.H1Env;
 import com.example.binance.enums.TimeFrame;
 
 import lombok.Getter;
@@ -19,6 +20,7 @@ import okhttp3.WebSocket;
 public class SymbolSession {
     private final String symbol;
     private final AtomicReference<BiasRegime> brRef;
+    private final AtomicReference<H1Env> h1EnvRef = new AtomicReference<H1Env>();
     private volatile WebSocket webSocket;
 
     private final Map<TimeFrame, Deque<Candle>> buffers = new ConcurrentHashMap<>();
