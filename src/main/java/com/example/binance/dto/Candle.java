@@ -13,5 +13,6 @@ import lombok.Setter;
 @Builder
 public class Candle {
     private long openTime; //ms
+    private long closeTime;
     private double open, high, low, close, volume;
 }

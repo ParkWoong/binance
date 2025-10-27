@@ -26,8 +26,7 @@ public class ScheduledConfig {
 
     @EventListener(ApplicationReadyEvent.class)
     public void checkProperties(){
-        //final String coin = "ETHUSDT";
-
+    
         BiasRegime br = directionService.evaluate(coin);
         klineSocketService.start(coin, br);
         log.info("{} | {}", br.getBias(), br.getRegime());

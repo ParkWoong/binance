@@ -29,8 +29,6 @@ public class TriggerService {
 
     // Set Current Time
     private final ZoneId AEST = ZoneId.of("Australia/Sydney");
-
-    // ?
     private final Set<String> sentKeys = Collections.synchronizedSet(new HashSet<>());
 
     public void onCandleClosedWithH1Env(SymbolSession sess) {
@@ -40,12 +38,17 @@ public class TriggerService {
             return;
 
         Deque<Candle> m15 = sess.getBuffers().get(TimeFrame.M15);
-        if (m15 == null || m15.size() < 40)
+        if (m15 == null || m15.size() < 40){
+            log.warn("Warning from M15 Size");
             return;
-
+        }
+            
         H1Env env = sess.getH1EnvRef().get();
-        if (env == null)
+        if (env == null){
+            log.warn("Warning from there is no H1 objects");
             return;
+        }
+            
 
         List<Candle> m15List = new ArrayList<>(m15);
         Candle last = m15List.get(m15List.size() - 1);
@@ -67,6 +70,7 @@ public class TriggerService {
         boolean rsiRecover = prevRsi < 48 && rsi15 >= 50;
         boolean momentumOk = volSpike || rsiRecover || rsi15 >= 55;
 
+        // Bias and Regime Check
         BiasRegime br = sess.getBrRef().get();
 
         if (br.getRegime() == BiasRegime.Regime.TREND) {

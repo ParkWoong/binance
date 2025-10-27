@@ -1,6 +1,8 @@
 spring:
     application:
         name: binance
+    profiles:
+        active: local
 
 binance:
     domain:
@@ -8,4 +10,7 @@ binance:
         get:
             time: "/fapi/v1/time"
         klines: "/fapi/v1/klines"
+        ws: "wss://fstream.binance.com/stream"
+telegram:
+    domain: https://api.telegram.org/bot${telegram.token}/sendMessage
   

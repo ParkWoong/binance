@@ -48,6 +48,7 @@ public class BInanceRestService {
             // kline 배열 인덱스: 0 opentime,1 open,2 high,3 low,4 close,5 volume,6 closetime ...
             out.add(Candle.builder()
                     .openTime(((Number) k.get(0)).longValue())
+                    .closeTime(((Number)k.get(6)).longValue())
                     .open(Double.parseDouble((String) k.get(1)))
                     .high(Double.parseDouble((String) k.get(2)))
                     .low(Double.parseDouble((String) k.get(3)))
