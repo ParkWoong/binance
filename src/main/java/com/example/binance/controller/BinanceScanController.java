@@ -48,5 +48,4 @@ public class BinanceScanController {
     public void sendMessage(@RequestParam String message) {
         notifier.send(message);
     }
-    
 }

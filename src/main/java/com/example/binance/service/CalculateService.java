@@ -10,7 +10,7 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 
 import com.example.binance.dto.Candle;
-import com.example.binance.dto.H1Env;
+import com.example.binance.dto.BootStrapEnv;
 import com.example.binance.enums.TimeFrame;
 import com.example.binance.utils.Notifier;
 import com.example.binance.ws.SymbolSession;
@@ -21,20 +21,15 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class OnlyH1Service {
+public class CalculateService {
 
     private final IndicatorService ind;
     private final Notifier notifier;
     private final Set<String> sentKeys = Collections.synchronizedSet(new HashSet<>());
 
     public void onCandleClosed_H1M15(SymbolSession sess) {
-        // 1) 트레이딩 시간 필터 (호주 14:00~22:00)
-        //ZonedDateTime now = ZonedDateTime.now(AEST);
-        //int hour = now.getHour();
-        //if (hour < 14 || hour >= 22){ return; }
-            
 
-        // 2) 버퍼 체크
+        // 1) 버퍼 체크
         Deque<Candle> h1 = sess.getBuffers().get(TimeFrame.H1);
         Deque<Candle> m15 = sess.getBuffers().get(TimeFrame.M15);
         
@@ -48,19 +43,23 @@ public class OnlyH1Service {
         if (h1.size() < 60 || m15.size() < 60) 
             { log.warn("Invalid Buffers"); return; }
 
-        // 3) H1 환경 (부트스트랩/갱신된 값)
-        H1Env env = sess.getH1EnvRef().get();
+        // 2) H1 환경 (부트스트랩/갱신된 값)
+        BootStrapEnv env = sess.getH1EnvRef().get();
         if (env == null) { log.warn("Invalid H1"); return;}
 
-        // 4) 동일 시간대 매핑: 해당 15m 봉이 env.hourKey 내에 있어야 함
+        // 3) 동일 시간대 매핑: 해당 15m 봉이 env.hourKey 내에 있어야 함
         List<Candle> m15List = new ArrayList<Candle>(m15);
         Candle last = m15List.get(m15List.size() - 1);
         Candle prev = m15List.get(m15List.size() - 2);
         long hourKeyOfM15 = floorToHourEnd(last.getOpenTime()); // 15:45~16:00 → 16:00
-        if (hourKeyOfM15 != env.getHourKey()){ log.warn("Invalid Hour Key"); return;}
+        
+        if (hourKeyOfM15 != env.getHourKey()){ 
+            log.warn("Invalid Hour Key => M15 : {} | ENV : {}", hourKeyOfM15, env.getHourKey()); 
+            return;
+        }
             
 
-        // 5) 지표 계산
+        // 4) 지표 계산
         double[] bb15 = ind.bollinger(m15List, TimeFrame.M15, 20, 2);
         double rsi15 = ind.rsi(m15List, TimeFrame.M15, 14);
         double prevRsi = ind.rsi(m15List.subList(0, m15List.size() - 1), TimeFrame.M15, 14);
@@ -77,11 +76,13 @@ public class OnlyH1Service {
                 sum += m15List.get(i).getVolume();
             avgVol = sum / 20.0;
         }
-        boolean volSpike = avgVol > 0 && last.getVolume() >= 1.3 * avgVol;
-        boolean rsiRecoverUp = (prevRsi < 48.0 && rsi15 >= 50.0); // for Long
-        boolean rsiRecoverDown = (prevRsi > 52.0 && rsi15 <= 50.0); // for Short
+        boolean volSpike = avgVol > 0 && last.getVolume() >= 1.2 * avgVol;
+        boolean rsiRecoverUp = (prevRsi < 49.0 && rsi15 >= 50.0); // for Long
+        boolean rsiRecoverDown = (prevRsi > 51.0 && rsi15 <= 50.0); // for Short
         boolean momentumLongOk = volSpike || rsiRecoverUp || rsi15 >= 55.0;
         boolean momentumShortOk = volSpike || rsiRecoverDown || rsi15 <= 45.0;
+
+        double eps = 0.0005 * last.getClose();
 
         log.info("===[H1 Env] : LONG {} | SHORT {} ===", env.isLongOk(), env.isShortOk());
 
@@ -89,10 +90,15 @@ public class OnlyH1Service {
         boolean longTriggered = false;
 
         if (env.isLongOk()) {
-            boolean longTrigger = ((prev.getClose() <= bb15[0] && last.getClose() > bb15[0]) // 중심선 재탈환
-                    || (last.getClose() > bb15[1])) // 상단 돌파
-                    && momentumLongOk;
+
+            /* 필터링 완화 */
+            boolean crossUpMid  = (prev.getClose() <= bb15[0] + eps) && (last.getClose() >= bb15[0] - eps);
+            boolean longTrigger  = (crossUpMid  || last.getClose() > bb15[1]) && momentumLongOk;
             
+            // boolean longTrigger = ((prev.getClose() <= bb15[0] && last.getClose() > bb15[0]) // 중심선 재탈환
+            //         || (last.getClose() > bb15[1])) // 상단 돌파
+            //         && momentumLongOk;
+
             log.info("[LONG Alert] : {}", longTrigger);
 
             if (longTrigger) {
@@ -109,9 +115,14 @@ public class OnlyH1Service {
 
         // 양방향이 동시에 true가 날 수 있어 tie-break 필요 → long 우선 후 아니면 short
         if (!longTriggered && env.isShortOk()) {
-            boolean shortTrigger = ((prev.getClose() >= bb15[0] && last.getClose() < bb15[0]) // 중심선 상실
-                    || (last.getClose() < bb15[2])) // 하단 돌파
-                    && momentumShortOk;
+            
+            /* 필터링 완화 */
+            boolean crossDnMid  = (prev.getClose() >= bb15[0] - eps) && (last.getClose() <= bb15[0] + eps);
+            boolean shortTrigger = (crossDnMid  || last.getClose() < bb15[2]) && momentumShortOk;
+            
+            // boolean shortTrigger = ((prev.getClose() >= bb15[0] && last.getClose() < bb15[0]) // 중심선 상실
+            //         || (last.getClose() < bb15[2])) // 하단 돌파
+            //         && momentumShortOk;
 
             log.info("[SHORT Alert] : {}", shortTrigger);
 
@@ -125,9 +136,6 @@ public class OnlyH1Service {
                         "H1+M15 SHORT: 15m mid loss/lower break & (Vol↑ or RSI↓)");
             }
         }
-
-        // 필요 시: longTriggered && shortTriggered 모두 발생할 드문 상황에서 규칙 추가 가능
-        // (예: RSI/가격 위치 기준 우선순위 결정). 현재는 LONG 우선 처리 후 SHORT는 패스.
     }
 
     /** 15:45~16:00 봉 openTime → 16:00 (해당 시간 경계)로 정규화 */
@@ -137,6 +145,7 @@ public class OnlyH1Service {
         return close - (close % hour); // 해당 시간 경계(예: 16:00)
     }
 
+    /* 트리거 발생 시 알림 */
     private void sendOnce(String symbol, String tf, String side, long closeTime,
             double entry, double stop, double tp1, double tp2, String reason) {
 
@@ -149,7 +158,5 @@ public class OnlyH1Service {
                     symbol, tf, side, entry, stop, tp1, tp2, reason);
             notifier.send(msg);
         }
-
-        log.info("MSG : {}", msg);
     }
 }

@@ -12,7 +12,7 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 import com.example.binance.dto.BiasRegime;
 import com.example.binance.dto.Candle;
-import com.example.binance.dto.H1Env;
+import com.example.binance.dto.BootStrapEnv;
 import com.example.binance.enums.TimeFrame;
 import com.example.binance.utils.Notifier;
 import com.example.binance.ws.SymbolSession;
@@ -43,7 +43,7 @@ public class TriggerService {
             return;
         }
             
-        H1Env env = sess.getH1EnvRef().get();
+        BootStrapEnv env = sess.getH1EnvRef().get();
         if (env == null){
             log.warn("Warning from there is no H1 objects");
             return;

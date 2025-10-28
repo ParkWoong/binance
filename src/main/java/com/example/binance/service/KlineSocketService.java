@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 
 import com.example.binance.dto.BiasRegime;
 import com.example.binance.dto.Candle;
-import com.example.binance.dto.H1Env;
+import com.example.binance.dto.BootStrapEnv;
 import com.example.binance.enums.TimeFrame;
 import com.example.binance.properties.DomainProperties;
 import com.example.binance.ws.SymbolSession;
@@ -35,7 +35,7 @@ public class KlineSocketService {
     // private final TriggerService triggerService;
     private final IndicatorService ind;
     private final BInanceRestService bInanceRestService;
-    private final OnlyH1Service onlyH1Service;
+    private final CalculateService onlyH1Service;
 
     private final ObjectMapper om = new ObjectMapper();
     private final OkHttpClient client = new OkHttpClient();
@@ -227,7 +227,7 @@ public class KlineSocketService {
             dq.addLast(c);
         }
 
-        H1Env env = computeH1Env(h1);
+        BootStrapEnv env = computeH1Env(h1);
         session.getH1EnvRef().set(env);
 
         log.info("H1 Value from first api : {}, longOk = {}, shortOk = {}", symbol, env.isLongOk(), env.isShortOk());
@@ -270,13 +270,13 @@ public class KlineSocketService {
         if (dq == null || dq.size() < 60)
             return;
         java.util.List<Candle> h1List = new java.util.ArrayList<Candle>(dq);
-        H1Env env = computeH1Env(h1List);
+        BootStrapEnv env = computeH1Env(h1List);
         sess.getH1EnvRef().set(env);
         log.info("Refresh H1Env {}: hourKey={}, longOk={}, shortOk={}",
                 sess.getSymbol(), env.getHourKey(), env.isLongOk(), env.isShortOk());
     }
 
-    private H1Env computeH1Env(List<Candle> h1) {
+    private BootStrapEnv computeH1Env(List<Candle> h1) {
         // 지표 계산
         double ema21 = ind.ema(h1, TimeFrame.H1, 21);
         double ema50 = ind.ema(h1, TimeFrame.H1, 50);
@@ -305,7 +305,7 @@ public class KlineSocketService {
         boolean longOk = longScore >= 2;
         boolean shortOk = shortScore >= 2;
 
-        return H1Env.builder()
+        return BootStrapEnv.builder()
                 .hourKey(hourKey)
                 .longOk(longOk)
                 .shortOk(shortOk)

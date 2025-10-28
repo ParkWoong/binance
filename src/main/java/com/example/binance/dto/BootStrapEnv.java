@@ -9,7 +9,7 @@ import lombok.Setter;
 @Setter
 @Builder
 @AllArgsConstructor
-public class H1Env {
+public class BootStrapEnv {
     private long hourKey;
     private boolean longOk;
     private boolean shortOk;
