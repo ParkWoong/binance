@@ -193,28 +193,6 @@ You can tweak the cron expressions if your trading window changes.
 
 ---
 
-## 🔍 Known nits & small TODOs
-
-* **Typo**: `BInanceRestService` → should be `BinanceRestService` (class + bean name).
-* **Compute env bug**: In `KlineSocketService#computeH1Env`, the builder sets `bbUp` twice; the second one should be `bbLow`:
-
-  ```java
-  return BootStrapEnv.builder()
-      .hourKey(hourKey)
-      .longOk(longOk)
-      .shortOk(shortOk)
-      .bbMid(bb[0])
-      .bbUp(bb[1])
-      .bbLow(bb[2]) // ← fix here
-      .build();
-  ```
-* **Symbol flexibility**: default coin is `ETHUSDT` (hard‑coded in `ScheduledConfig`). Consider making it configurable via `application.yml` or env.
-* **Backtest**: Live triggers are cool, but add a backtesting module for sanity checks.
-* **Resilience**: On WS failure it restarts, but you may want exponential backoff and metrics.
-* **Unit tests**: Add tests for indicator adapters and trigger edges (mid‑band epsilon, RSI crossover, etc.).
-
----
-
 ## 🧰 Local curl cheatsheet
 
 ```bash
