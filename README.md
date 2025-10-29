@@ -259,7 +259,7 @@ Apache License 2.0 (wrapper scripts carry ASF headers). For your own code, add a
 
 ## 🧠 Appendix — Mental model (Mermaid)
 
-```mermaid
+```
 flowchart TD
     A[App Ready] --> B[DirectionService D1/H4]
     B -->|Bias/Regime| C[Start Session]
