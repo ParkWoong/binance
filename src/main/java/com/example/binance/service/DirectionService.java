@@ -13,7 +13,7 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class DirectionService {
-    private final BInanceRestService rest;
+    private final BinanceRestService rest;
     private final IndicatorService ind;
 
     public BiasRegime evaluate(final String symbol){
