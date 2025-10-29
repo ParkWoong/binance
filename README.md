@@ -269,5 +269,3 @@ flowchart TD
     E -->|closed 15m| G[Trigger Eval (M15 gated by H1)]
     G -->|trigger| H[Telegram Notifier]
 ```
-
-If you want, I can split this into a **README.md** and a separate **docs/PROCESS.md**, or tailor the README for GitHub with shields, prettier sections, and a demo GIF later. 👍
