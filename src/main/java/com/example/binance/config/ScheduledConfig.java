@@ -7,6 +7,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import com.example.binance.dto.BiasRegime;
+import com.example.binance.properties.CoinProperties;
 import com.example.binance.service.DirectionService;
 import com.example.binance.service.KlineSocketService;
 
@@ -22,10 +23,12 @@ public class ScheduledConfig {
 
     private final DirectionService directionService;
     private final KlineSocketService klineSocketService;
-    private static final String coin = "ETHUSDT";
+    private final CoinProperties coinProperties;
 
     @EventListener(ApplicationReadyEvent.class)
     public void checkProperties(){
+
+        final String coin = coinProperties.getSymbol();
     
         BiasRegime br = directionService.evaluate(coin);
         klineSocketService.start(coin, br);
@@ -34,6 +37,8 @@ public class ScheduledConfig {
 
     @Scheduled(cron = "0 0 */4 * * *", zone = "Australia/Sydney")
     public void refreshRegime(){
+
+        final String coin = coinProperties.getSymbol();
         
         BiasRegime newBr = directionService.evaluate(coin);
         klineSocketService.updateBiasRegime(coin, newBr);
@@ -43,6 +48,8 @@ public class ScheduledConfig {
 
     @Scheduled(cron = "0 5 0 * * *", zone = "Australia/Sydney")
     public void refreshBias(){
+        
+        final String coin = coinProperties.getSymbol();
         
         BiasRegime newBr = directionService.evaluate(coin);
         klineSocketService.updateBiasRegime(coin, newBr);

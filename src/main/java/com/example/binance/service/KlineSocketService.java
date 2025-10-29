@@ -34,7 +34,7 @@ public class KlineSocketService {
     private final DomainProperties domain;
     // private final TriggerService triggerService;
     private final IndicatorService ind;
-    private final BInanceRestService bInanceRestService;
+    private final BinanceRestService bInanceRestService;
     private final CalculateService onlyH1Service;
 
     private final ObjectMapper om = new ObjectMapper();
@@ -311,7 +311,7 @@ public class KlineSocketService {
                 .shortOk(shortOk)
                 .bbMid(bb[0])
                 .bbUp(bb[1])
-                .bbUp(bb[2])
+                .bbLow(bb[2])
                 .build();
     }
 }

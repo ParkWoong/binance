@@ -13,4 +13,6 @@ binance:
         ws: "wss://fstream.binance.com/stream"
 telegram:
     domain: https://api.telegram.org/bot${telegram.token}/sendMessage
-  
+
+coin:
+    symbol: "ETHUSDT"

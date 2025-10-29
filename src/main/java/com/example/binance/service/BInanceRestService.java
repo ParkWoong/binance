@@ -19,7 +19,7 @@ import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
-public class BInanceRestService {
+public class BinanceRestService {
     private final DomainProperties domainProperties;
 
     public List<Candle> klines(String symbol, TimeFrame tf, int limit) {
