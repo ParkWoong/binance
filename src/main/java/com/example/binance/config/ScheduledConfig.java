@@ -3,14 +3,9 @@ package com.example.binance.config;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.scheduling.annotation.Scheduled;
 
-import com.example.binance.dto.BiasRegime;
 import com.example.binance.properties.CoinProperties;
-import com.example.binance.service.DirectionService;
 import com.example.binance.service.KlineSocketService;
-
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,43 +13,15 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @Configuration
 @Slf4j
-@EnableScheduling
 public class ScheduledConfig {
 
-    private final DirectionService directionService;
     private final KlineSocketService klineSocketService;
     private final CoinProperties coinProperties;
 
     @EventListener(ApplicationReadyEvent.class)
     public void checkProperties(){
-
         final String coin = coinProperties.getSymbol();
-    
-        BiasRegime br = directionService.evaluate(coin);
-        klineSocketService.start(coin, br);
-        log.info("{} | {}", br.getBias(), br.getRegime());
+        klineSocketService.start(coin, null);
+        log.info("WebSocket started for: {}", coin);
     }
-
-    @Scheduled(cron = "0 0 */4 * * *", zone = "Australia/Sydney")
-    public void refreshRegime(){
-
-        final String coin = coinProperties.getSymbol();
-        
-        BiasRegime newBr = directionService.evaluate(coin);
-        klineSocketService.updateBiasRegime(coin, newBr);
-
-        log.info("[Refresh] {} | {}", newBr.getBias(), newBr.getRegime());
-    }
-
-    @Scheduled(cron = "0 5 0 * * *", zone = "Australia/Sydney")
-    public void refreshBias(){
-        
-        final String coin = coinProperties.getSymbol();
-        
-        BiasRegime newBr = directionService.evaluate(coin);
-        klineSocketService.updateBiasRegime(coin, newBr);
-
-        log.info("[Refresh] {} | {}", newBr.getBias(), newBr.getRegime());
-    }
-    
 }

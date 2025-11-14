@@ -2,8 +2,6 @@ package com.example.binance.controller;
 
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.binance.dto.BiasRegime;
-import com.example.binance.service.DirectionService;
 import com.example.binance.service.KlineSocketService;
 import com.example.binance.utils.Notifier;
 
@@ -19,7 +17,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Slf4j
 public class BinanceScanController {
     
-    private final DirectionService directionService;
     private final KlineSocketService klineSocketService;
     private final Notifier notifier;
 
@@ -28,10 +25,9 @@ public class BinanceScanController {
         
         log.info("Trading Start : {}", coin);
         
-        BiasRegime br = directionService.evaluate(coin);
-        klineSocketService.start(coin, br);
+        klineSocketService.start(coin, null);
         
-        return "bias=" + br.getBias() + ", regime=" + br.getRegime();
+        return "WebSocket started for: " + coin;
     }
 
     @GetMapping("/session/state")

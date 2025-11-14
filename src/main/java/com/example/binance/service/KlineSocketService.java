@@ -5,11 +5,9 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.springframework.stereotype.Service;
 
-import com.example.binance.dto.BiasRegime;
 import com.example.binance.dto.Candle;
 import com.example.binance.dto.BootStrapEnv;
 import com.example.binance.enums.TimeFrame;
@@ -32,7 +30,6 @@ import okhttp3.WebSocketListener;
 public class KlineSocketService {
 
     private final DomainProperties domain;
-    // private final TriggerService triggerService;
     private final IndicatorService ind;
     private final BinanceRestService bInanceRestService;
     private final CalculateService onlyH1Service;
@@ -42,21 +39,24 @@ public class KlineSocketService {
 
     private final Map<String, SymbolSession> sessions = new ConcurrentHashMap<>();
 
-    public SymbolSession start(final String symbol, BiasRegime initial) {
+    public SymbolSession start(final String symbol, Object unused) {
 
         if (sessions.containsKey(symbol)) {
             return sessions.get(symbol);
         }
 
-        SymbolSession sess = new SymbolSession(symbol, new AtomicReference<BiasRegime>(initial));
+        SymbolSession sess = new SymbolSession(symbol);
 
         sessions.put(symbol, sess);
 
         bootStrapH1Env(symbol, sess);
 
         bootstrapM15Buffer(symbol, sess, 200);
+        bootstrapM5Buffer(symbol, sess, 200);
 
         final String streams = new StringBuilder(symbol.toLowerCase())
+                .append("@kline_5m/")
+                .append(symbol.toLowerCase())
                 .append("@kline_15m/")
                 .append(symbol.toLowerCase())
                 .append("@kline_1h")
@@ -90,7 +90,7 @@ public class KlineSocketService {
 
                     log.info("[RAW Message] {}", text);
 
-                    String interval = k.path("i").asText(); // "15m" or "1h"
+                    String interval = k.path("i").asText(); // "5m", "15m" or "1h"
                     long openTime = k.path("t").asLong();
                     long closeTime = k.path("T").asLong();
                     double o = k.path("o").asDouble();
@@ -100,7 +100,9 @@ public class KlineSocketService {
                     double v = k.path("v").asDouble();
 
                     TimeFrame tf;
-                    if ("15m".equals(interval)) {
+                    if ("5m".equals(interval)) {
+                        tf = TimeFrame.M5;
+                    } else if ("15m".equals(interval)) {
                         tf = TimeFrame.M15;
                     } else {
                         tf = TimeFrame.H1;
@@ -128,17 +130,16 @@ public class KlineSocketService {
                     // ✅ 2-b) M15 마감 들어오면 H1Env를 게이트로 트리거 평가
                     if (tf == TimeFrame.M15) {
                         log.info("===== Get Trigger =====");
-                        // triggerService.onCandleClosedWithH1Env(sess);
                         onlyH1Service.onCandleClosed_H1M15(sess);
                     }
 
-                    // java.util.Deque<Candle> dq1h = sess.getBuffers().get(TimeFrame.H1);
-                    // java.util.Deque<Candle> dq15m = sess.getBuffers().get(TimeFrame.M15);
-
-                    // if (dq1h != null && dq15m != null && dq1h.size() >= 60 && dq15m.size() >= 60)
-                    // {
-                    // triggerService.onCandleClosed(sess);
-                    // }
+                    // ✅ 2-c) M5 마감 들어오면 활성화 상태 확인 후 트리거 평가
+                    if (tf == TimeFrame.M5) {
+                        if (sess.isM5Active()) {
+                            log.info("===== M5 Trigger Check =====");
+                            onlyH1Service.onCandleClosed_M5(sess);
+                        }
+                    }
 
                 } catch (Exception e) {
                     log.warn("WS parse error {}: {}", symbol, e.getMessage());
@@ -149,7 +150,7 @@ public class KlineSocketService {
             public void onFailure(WebSocket webSocket, Throwable t, Response response) {
                 log.error("WS failure {} {}", symbol, t.getMessage());
                 close(symbol);
-                start(symbol, sess.getBrRef().get());
+                start(symbol, null);
             }
 
             @Override
@@ -170,20 +171,6 @@ public class KlineSocketService {
                 sess.getWebSocket().close(1000, "bye");
             } catch (Exception e) {
             }
-        }
-    }
-
-    /** 외부 스케줄러(1D/4H 마감)에서 Bias/Regime 갱신 */
-    public void updateBiasRegime(String symbol, BiasRegime br) {
-
-        SymbolSession sess = sessions.get(symbol);
-
-        // final String time = getNowMinute();
-
-        if (sess != null) {
-            sess.getBrRef().set(br);
-            // log.info("[Refresh] {} | {} | {}", time, sess.getBrRef().get().getBias(),
-            // sess.getBrRef().get().getRegime());
         }
     }
 
@@ -262,6 +249,38 @@ public class KlineSocketService {
 
         } catch (Exception e) {
             // TODO: handle exception
+        }
+    }
+
+    private void bootstrapM5Buffer(final String symbol, SymbolSession sess, int limit) {
+        try {
+            List<Candle> m5 = bInanceRestService.klines(symbol, TimeFrame.M5, limit);
+            if (m5 == null || m5.isEmpty()) {
+                log.warn("M5 bootstrap is empty : {}", symbol);
+                return;
+            }
+
+            m5.sort(Comparator.comparingLong(Candle::getCloseTime));
+
+            Deque<Candle> dq = sess.buffer(TimeFrame.M5);
+            dq.clear();
+
+            long prevClose = -1L;
+            for (Candle cd : m5) {
+                long ct = cd.getCloseTime();
+                if (ct <= prevClose) continue; // 중복 또는 역순 드롭
+                dq.addLast(cd);
+                prevClose = ct;
+                // 상한(메모리 캡)
+                while (dq.size() > 300)
+                    dq.removeFirst();
+            }
+
+            log.info("Bootstrap M5 {}: loaded={}, buffered={}, lastClose={}",
+                symbol, m5.size(), dq.size(), prevClose);
+
+        } catch (Exception e) {
+            log.warn("M5 bootstrap error: {}", e.getMessage());
         }
     }
 

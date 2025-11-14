@@ -14,9 +14,6 @@ import org.ta4j.core.BaseBarSeriesBuilder;
 import org.ta4j.core.indicators.EMAIndicator;
 import org.ta4j.core.indicators.RSIIndicator;
 import org.ta4j.core.indicators.SMAIndicator;
-import org.ta4j.core.indicators.adx.ADXIndicator;
-import org.ta4j.core.indicators.adx.MinusDIIndicator;
-import org.ta4j.core.indicators.adx.PlusDIIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
 import org.ta4j.core.num.DecimalNum;
@@ -30,10 +27,9 @@ public class IndicatorService {
     
     private Duration toDuration(TimeFrame tf){
         return switch (tf) {
-            case D1 -> Duration.ofDays(1);
-            case H4  -> Duration.ofHours(4);
             case H1  -> Duration.ofHours(1);
             case M15 -> Duration.ofMinutes(15);
+            case M5  -> Duration.ofMinutes(5);
         };
     }
 
@@ -87,21 +83,6 @@ public class IndicatorService {
         double mid = sma.getValue(i).doubleValue();
         double std = sd.getValue(i).doubleValue();
         return new double[] { mid, mid + k*std, mid - k*std };
-    }
-
-    /** ADX(+DI/-DI) */
-    public double[] adxDmi(List<Candle> candles, TimeFrame tf, int period) {
-        BarSeries s = toSeries("adx-" + tf, tf, candles);
-        ADXIndicator adx = new ADXIndicator(s, period);
-        PlusDIIndicator pdi = new PlusDIIndicator(s, period);
-        MinusDIIndicator mdi = new MinusDIIndicator(s, period);
-
-        int i = s.getEndIndex();
-        return new double[] {
-                adx.getValue(i).doubleValue(),
-                pdi.getValue(i).doubleValue(),
-                mdi.getValue(i).doubleValue()
-        };
     }
 
 }
